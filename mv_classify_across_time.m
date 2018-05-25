@@ -50,7 +50,7 @@ function [perf, result] = mv_classify_across_time(cfg, X, clabel)
 % .P            - if CV is 'holdout', P is the fraction of test samples
 %                 (default 0.1)
 % .stratify     - if 1, the class proportions are approximately preserved
-%                 in each fold (default 1)
+%                 in each fold (de+fault 1)
 % .repeat       - number of times the cross-validation is repeated with new
 %                 randomly assigned folds (default 1)
 %
@@ -169,10 +169,10 @@ if ~strcmp(cfg.CV,'none')
                 Xtest= squeeze(X(CV.test(kk),:,cfg.time(tt)));
 
                 % Train classifier
-                cf= train_fun(cfg.param, Xtrain_tt, trainlabel);
+                cf{tt}= train_fun(cfg.param, Xtrain_tt, trainlabel);
 
                 % Obtain classifier output (class labels or dvals)
-                cf_output{rr,kk,tt} = mv_get_classifier_output(cfg.cf_output, cf, test_fun, Xtest);
+                cf_output{rr,kk,tt} = mv_get_classifier_output(cfg.cf_output, cf{tt}, test_fun, Xtest);
                 
             end
         end
@@ -233,4 +233,5 @@ if nargout>1
    result.repeat    = cfg.repeat;
    result.nclasses  = nclasses;
    result.classifier = cfg.classifier;
+   result.cf = cf;
 end
