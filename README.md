@@ -1,3 +1,3 @@
 # MVPA-Light
 
-Development branch. Functions might be unfinished, untested or buggy. Use at your own risk ʕ•ᴥ•ʔ
+Development branch. This is where my modifications and tests are sorted out. One day or the other i sohuld ask treder to merge ...
