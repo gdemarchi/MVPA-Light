@@ -1,31 +1,37 @@
-function CV = mv_get_crossvalidation_folds(cv, clabel, k, stratify, frac)
+function CV = mv_get_crossvalidation_folds(cv, y, k, stratify, frac, fold)
 % Defines a cross-validation scheme and returns a cvpartition object with
 % the definition of the folds.
 %
 % Usage:
-% CV = mv_get_crossvalidation_folds(cv, clabel, K, stratify, P)
+% CV = mv_get_crossvalidation_folds(cv, y, k, stratify, frac, fold)
 %
 %Parameters:
 % cv          - cross-validation type:
 %               'kfold':     K-fold cross-validation. The parameter K specifies
 %                            the number of folds
-%               'leave1out': leave-one-out cross-validation
-%               'holdout':   Split data just once into training and
+%               'leaveout': leave-one-out cross-validation
+%               'holdout':  Randomly splits data just once into training and
 %                            hold-out/test set
-% clabel      - vector of class labels
+%               'predefined': uses folds predefined by the user. In
+%                            this case, fold needs to be set. You should
+%                            set cfg.repeat = 1 since there is no
+%                            randomness.
+% y           - vector of class labels or regression outputs
 % k           - number of folds (the k in k-fold) (default 5)
 % stratify    - if 1, class proportions are roughly preserved in
 %               each fold (default 0)
 % frac        - if cv_type is 'holdout', frac is the fraction of test samples
 %                 (default 0.1)
+% fold        - if cv_type='predefined', fold is a vector of length
+%                 #samples containing of 1's, 2's, 3's etc that specifies 
+%                 for each sample the fold that it belongs to
 %
 %Output:
 % CV - struct with cross-validation folds
 
-% (c) Matthias Treder 2017-18
+% (c) Matthias Treder
 
-
-N = numel(clabel);
+N = size(y,1);
 
 if nargin < 3,      k = 5; end
 if nargin < 4,      stratify = 0; end
@@ -34,7 +40,7 @@ if nargin < 5,      frac = 0.1; end
 switch(cv)
     case 'kfold'
         if stratify
-            CV= cvpartition(clabel,'kfold', k);
+            CV= cvpartition(y,'kfold', k);
         else
             CV= cvpartition(N, 'kfold', k);
         end
@@ -44,63 +50,29 @@ switch(cv)
         
     case 'holdout'
         if stratify
-            CV= cvpartition(clabel,'holdout',frac);
+            CV= cvpartition(y,'holdout',frac);
         else
             CV= cvpartition(N,'holdout',frac);
         end
         
+    case 'predefined'
+        CV = struct();
+        u = unique(fold);
+        n_groups = numel(u);
+        CV.u            = u;
+        CV.group        = fold;
+        CV.NumTestSets  = numel(u);
+        CV.NumObservations  = numel(fold);
+        if iscell(fold)
+            CV.training     = @(x) ~ismember(CV.group, CV.u(x));
+            CV.test         = @(x) ismember(CV.group, CV.u(x));
+            CV.TrainSize    = arrayfun(@(x) sum(~ismember(fold, u(x))), 1:n_groups);
+            CV.TestSize     = arrayfun(@(x) sum(ismember(fold, u(x))), 1:n_groups);
+        else
+            CV.training     = @(x) CV.group ~= CV.u(x);
+            CV.test         = @(x) CV.group == CV.u(x);
+            CV.TrainSize    = arrayfun(@(x) sum(fold ~= u(x)), 1:n_groups);
+            CV.TestSize     = arrayfun(@(x) sum(fold == u(x)), 1:n_groups);
+        end
     otherwise error('Unknown cross-validation type: %s',cv)
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-% 
-% % Leave-one-out is equal to k-fold when we set K = N
-% if strcmp(cv_type,'leave1out')
-%     K = N;
-% end
-% 
-% %% Set up cross-validation struct
-% CV = struct();
-% CV.type = cv_type;
-% CV.test = cell(K,1);
-% CV.training = cell(K,1);
-% 
-% %% Get class frequencies
-% nSamPerClass = arrayfun( @(u) sum(clabel == u), unique(clabel));
-% freq = nSamPerClass / N;
-% 
-% %% Define folds
-% switch(cv_type)
-%     
-%     %% --- K-FOLD ---
-%     case {'kfold','leave1out'}
-%         
-%         % In order to stratify, we need to have more samples than folds in
-%         % each class
-%         if stratify && any(nSamPerClass < K)
-%             warning('Some folds do not have instances of each class because there is too few')
-%         end
-%         if K==N
-%             stratify = 0;
-%         end
-%         
-%         % Randomly define folds
-%         if stratify
-%             
-%         else
-%         end
-% 
-%     otherwise error('Unknown cross-validation type: %s',cv_type)
-% end
-% 

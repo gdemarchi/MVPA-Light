@@ -1,34 +1,36 @@
-function [cfg, clabel, nclasses] = mv_check_inputs(cfg, X, clabel)
-% Performs some sanity checks on input parameters cfg, X, and y.
+function [cfg, clabel, n_classes,n_metrics] = mv_check_inputs(cfg, X, clabel)
+% Performs some sanity checks and sets some defaults for input parameters 
+% cfg, X, and y.
 % Also checks whether external toolboxes (LIBSVM and LIBLINEAR) are
 % available if required.
 
 if ~iscell(cfg.metric)
     cfg.metric = {cfg.metric};
 end
+n_metrics = numel(cfg.metric);
 
 %% clabel: check class labels
 clabel = clabel(:);
 u = unique(clabel);
-nclasses = length(u);
+n_classes = length(u);
 
-if ~all(ismember(clabel,1:nclasses))
+if ~all(ismember(clabel,1:n_classes))
     warning('Class labels should consist of integers 1 (class 1), 2 (class 2), 3 (class 3) and so on. Relabelling them accordingly.');
     newlabel = nan(numel(clabel), 1);
-    for i = 1:nclasses
+    for i = 1:n_classes
         newlabel(clabel==u(i)) = i; % set to 1:nth classes
     end
     clabel = newlabel;
 end
 
-if nclasses==1
+if n_classes==1
     error('Only one class specified. Class labels must contain at least 2 classes')
 end
 
 %% clabel and cfg: check whether there's more than 2 classes but yet a binary classifier is used
 binary_classifiers = {'lda' 'logreg' 'svm'};
-if nclasses > 2 && ismember(cfg.classifier, binary_classifiers)
-    error('Cannot use %s for a classification task with %d classes: use a multiclass classifier instead', upper(cfg.classifier), nclasses)
+if n_classes > 2 && ismember(cfg.classifier, binary_classifiers)
+    error('Cannot use %s for a classification task with %d classes: use a multiclass classifier instead', upper(cfg.classifier), n_classes)
 end
 
 %% cfg: check whether all parameters are written in lowercase
@@ -41,19 +43,39 @@ if any(not_lowercase)
     error('For consistency, all parameters must be given in lowercase: please replace cfg.%s by cfg.%s', fn{not_lowercase(1)},lower(fn{not_lowercase(1)}) )
 end
 
-% Are all cfg.param fields given in lowercase?
-if isfield(cfg,'param') && isstruct(cfg.param)
-    pfn = fieldnames(cfg.param);
+% Are all cfg.hyperparameter fields given in lowercase?
+if isfield(cfg,'hyperparameter') && isstruct(cfg.hyperparameter)
+    pfn = fieldnames(cfg.hyperparameter);
     not_lowercase = find(~strcmp(pfn,lower(pfn)));
     
     if any(not_lowercase)
-        error('For consistency, all parameters must be given in lowercase: please replace param.%s by param.%s', pfn{not_lowercase(1)},lower(pfn{not_lowercase(1)}) )
+        error('For consistency, all parameters must be given in lowercase: please replace hyperparameter.%s by hyperparameter.%s', pfn{not_lowercase(1)},lower(pfn{not_lowercase(1)}) )
     end
+end
+
+%% cfg: set defaults for cross-validation
+mv_set_default(cfg,'cv','kfold');
+mv_set_default(cfg,'repeat',5);
+mv_set_default(cfg,'k',5);
+mv_set_default(cfg,'p',0.1);
+mv_set_default(cfg,'stratify',1);
+mv_set_default(cfg,'fold',[]);
+
+switch(cfg.cv)
+    case 'leaveout', cfg.k = size(X,1);
+    case 'holdout', cfg.k = 1;
+end
+
+%% cfg: given a metric, set default for output_type
+if any(ismember({'dval','auc','roc','tval'},cfg.metric))
+    mv_set_default(cfg,'output_type','dval');
+else
+    mv_set_default(cfg,'output_type','clabel');
 end
 
 %% cfg: check whether different metrics are compatible with each other 
 % eg 'confusion' does not work with 'tval' because the former requires
-% class labels as ouput whereas the latter requires dvals
+% class labels as output whereas the latter requires dvals
 incompatible_metrics = { 'confusion' {'auc' 'tval' 'dval'};
     };
 
@@ -106,11 +128,56 @@ for ii=1:size(changed_fields, 1)
     end
 end
 
+if any(ismember(fn, {'balance', 'replace', 'normalise'}))
+    error('The fieldnames .balance / .replace / .normalise do not exist any more. Over/undersampling is now performed using the preprocessing options ''undersample'', ''oversample'', ''demean'', ''zscore''. See example7_preprocessing.m for example code.')
+end
+
 %% cfg: translate feedback specified as 'yes' or 'no' into boolean
 if ischar(cfg.feedback)
     if strcmp(cfg.feedback, 'yes'),     cfg.feedback = 1;
     elseif strcmp(cfg.feedback, 'no'),  cfg.feedback = 0;
     end
+end
+
+%% cfg.preprocess: set to empty array if does not exist, and turn into cell array if it isn't yet
+if ~isfield(cfg,'preprocess')
+    cfg.preprocess = {};
+elseif ~iscell(cfg.preprocess)
+    cfg.preprocess = {cfg.preprocess};
+end
+
+if ~isfield(cfg,'preprocess_param') || isempty(cfg.preprocess_param)
+    cfg.preprocess_param = {};
+elseif ~iscell(cfg.preprocess_param)
+    cfg.preprocess_param = {cfg.preprocess_param};
+elseif iscell(cfg.preprocess_param) && ischar(cfg.preprocess_param{1})
+    % in this case a cell array with key-value pairs has been passed as
+    % options for the first preprocess operation, so we also wrap it
+    cfg.preprocess_param = {cfg.preprocess_param};
+end
+
+%% cfg.preprocess_param: if it has less elements than .preprocess, add empty structs
+if numel(cfg.preprocess_param) < numel(cfg.preprocess)
+    cfg.preprocess_param(numel(cfg.preprocess_param)+1:numel(cfg.preprocess)) = {struct()};
+end
+
+%% cfg.preprocess_param: fill structs up with default parameters
+for ii=1:numel(cfg.preprocess_param)
+    if ischar(cfg.preprocess{ii})
+        cfg.preprocess_param{ii} = mv_get_preprocess_param(cfg.preprocess{ii}, cfg.preprocess_param{ii});
+    end
+end
+
+%% cfg.preprocess: convert preprocessing function to function handle
+for ii=1:numel(cfg.preprocess)
+    if ~isa(cfg.preprocess{ii}, 'function_handle')
+        cfg.preprocess{ii} = eval(['@mv_preprocess_' cfg.preprocess{ii}]);
+    end
+end
+
+%% cfg.preprocess: raise error if number of arguments in preprocess and preprocess_param does not match
+if numel(cfg.preprocess) ~= numel(cfg.preprocess_param)
+    error('The number of elements in cfg.preprocess and cfg.preprocess_param does not match')
 end
 
 %% X and clabel: check whether the number of instances matches the number of class labels
@@ -173,7 +240,7 @@ if strcmp(cfg.classifier, 'liblinear')
         try
             % this should work fine with liblinear but crash for Matlab's
             % train
-            train(0,0,'-q');
+            train(0,sparse(0),'-q');
         catch
             if numel(check)==1
                 % there is an train but it seems to be Matlab's one
@@ -185,3 +252,13 @@ if strcmp(cfg.classifier, 'liblinear')
         end
     end
 end
+
+%% Deprecation checks
+if isfield(cfg,'param') && (~isfield(cfg,'hyperparameter') || isempty(cfg.hyperparameter))
+    warning('cfg.param has been renamed to cfg.hyperparameter, changing cfg accordingly..');
+    cfg.hyperparameter = cfg.param;
+    cfg = rmfield(cfg,'param');
+end
+
+%% cfg: set defaults for classifier hyperparameter
+cfg.hyperparameter = mv_get_hyperparameter(cfg.classifier, cfg.hyperparameter);
