@@ -326,14 +326,14 @@ if ~strcmp(cfg.cv,'none')
                 end
                 
                 % Train classifier
-                cf= train_fun(cfg.hyperparameter, X_ix, trainlabel);
+                cf{ix}= train_fun(cfg.hyperparameter, X_ix, trainlabel);
 
                 % Obtain classifier output (labels, dvals or probabilities)
                 if isempty(gen_dim)
-                    cf_output{rr,kk,ix{:}} = mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest_ix);
+                    cf_output{rr,kk,ix{:}} = mv_get_classifier_output(cfg.output_type, cf{ix}, test_fun, Xtest_ix);
                 else
                     % we have to reshape classifier output back
-                    cf_output{rr,kk,ix{:}} = reshape( mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest_ix), numel(testlabel{rr,kk}),[]);
+                    cf_output{rr,kk,ix{:}} = reshape( mv_get_classifier_output(cfg.output_type, cf{ix}, test_fun, Xtest_ix), numel(testlabel{rr,kk}),[]);
                 end
             end
 
@@ -394,14 +394,14 @@ elseif strcmp(cfg.cv,'none')
         end
         
         % Train classifier
-        cf= train_fun(cfg.hyperparameter, X_ix, clabel);
+        cf{ix}= train_fun(cfg.hyperparameter, X_ix, clabel);
         
         % Obtain classifier output (labels, dvals or probabilities)
         if isempty(gen_dim)
-            cf_output{1,1,ix{:}} = mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest_ix);
+            cf_output{1,1,ix{:}} = mv_get_classifier_output(cfg.output_type, cf{ix}, test_fun, Xtest_ix);
         else
             % we have to reshape classifier output back
-            cf_output{1,1,ix{:}} = reshape( mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest_ix), numel(clabel),[]);
+            cf_output{1,1,ix{:}} = reshape( mv_get_classifier_output(cfg.output_type, cf{ix}, test_fun, Xtest_ix), numel(clabel),[]);
         end
     end
 
@@ -458,4 +458,5 @@ if nargout>1
    result.n_classes             = n_classes;
    result.classifier            = cfg.classifier;
    result.cfg                   = cfg;
+   result.cf                    = cf;
 end

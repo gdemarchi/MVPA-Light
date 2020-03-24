@@ -124,10 +124,10 @@ if ~strcmp(cfg.cv,'none')
                 Xtest_tt= squeeze(Xtest(:,:,cfg.time(tt)));
 
                 % Train classifier
-                cf= train_fun(cfg.hyperparameter, Xtrain_tt, trainlabel);
+                cf{tt}= train_fun(cfg.hyperparameter, Xtrain_tt, trainlabel);
 
                 % Obtain classifier output (class labels, dvals or probabilities)
-                cf_output{rr,kk,tt} = mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest_tt);
+                cf_output{rr,kk,tt} = mv_get_classifier_output(cfg.output_type, cf{tt}, test_fun, Xtest_tt);
                 
             end
         end
@@ -158,10 +158,10 @@ else
         Xtraintest= squeeze(X(:,:,cfg.time(tt)));
 
         % Train classifier
-        cf= train_fun(cfg.hyperparameter, Xtraintest, clabel);
+        cf{tt}= train_fun(cfg.hyperparameter, Xtraintest, clabel);
         
         % Obtain classifier output (class labels or dvals)
-        cf_output{1,1,tt} = mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtraintest);
+        cf_output{1,1,tt} = mv_get_classifier_output(cfg.output_type, cf{tt}, test_fun, Xtraintest);
     end
 
     testlabel = clabel;
@@ -209,4 +209,5 @@ if nargout>1
    result.n_classes             = n_classes;
    result.classifier            = cfg.classifier;
    result.cfg                   = cfg;
+   result.cf                    = cf;
 end

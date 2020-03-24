@@ -168,10 +168,10 @@ if ~strcmp(cfg.cv,'none') && ~hasX2
                 Xtrain_tt= squeeze(Xtrain(:,:,t1));
                 
                 % Train classifier
-                cf= train_fun(cfg.hyperparameter, Xtrain_tt, trainlabel);
+                cf{t1}= train_fun(cfg.hyperparameter, Xtrain_tt, trainlabel);
 
                 % Obtain classifier output (labels, dvals or probabilities)
-                cf_output{rr,kk,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest), numel(testlabel{rr,kk}),[]);
+                cf_output{rr,kk,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf{t1}, test_fun, Xtest), numel(testlabel{rr,kk}),[]);
             end
 
         end
@@ -211,10 +211,10 @@ elseif hasX2
         Xtrain= squeeze(X(:,:,t1));
 
         % Train classifier
-        cf= train_fun(cfg.hyperparameter, Xtrain, clabel);
+        cf{t1}= train_fun(cfg.hyperparameter, Xtrain, clabel);
 
         % Obtain classifier output (labels or dvals)
-        cf_output{1,1,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest), size(X2,1),[]);
+        cf_output{1,1,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf{t1}, test_fun, Xtest), size(X2,1),[]);
 
     end
 
@@ -249,10 +249,10 @@ elseif strcmp(cfg.cv,'none')
         Xtrain= squeeze(X(:,:,t1));
 
         % Train classifier
-        cf= train_fun(cfg.hyperparameter, Xtrain, clabel);
+        cf{t1}= train_fun(cfg.hyperparameter, Xtrain, clabel);
 
         % Obtain classifier output (labels, dvals or probabilities)
-        cf_output{1,1,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf, test_fun, Xtest), size(X,1),[]);
+        cf_output{1,1,t1} = reshape( mv_get_classifier_output(cfg.output_type, cf{t1}, test_fun, Xtest), size(X,1),[]);
 
     end
 
@@ -302,4 +302,5 @@ if nargout>1
    result.n_classes             = n_classes;
    result.classifier            = cfg.classifier;
    result.cfg                   = cfg;
+   result.cf                    = cf;
 end
